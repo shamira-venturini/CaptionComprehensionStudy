@@ -1,13 +1,183 @@
-Version: 1.0
+library("tidyverse")
+library('dplyr')
+library("Rmisc")
+library("tidyr")
+library('lme4')
+```
+Let's load the 'totals' sheet from the file and see data distribution:
+```{r}
+setwd("/Users/shamiraventurini/Desktop/Pilot")
+data <- read.csv("./Data.csv")
+mydf <- read.table("./Data.csv", sep = ';', header = TRUE) 
+data <- as_tibble(mydf) 
+data
+```
 
-RestoreWorkspace: Default
-SaveWorkspace: Default
-AlwaysSaveHistory: Default
+#Dividing data by condition
 
-EnableCodeIndexing: Yes
-UseSpacesForTab: Yes
-NumSpacesForTab: 2
-Encoding: UTF-8
 
-RnwWeave: Sweave
-LaTeX: pdfLaTeX
+
+autocc <-subset(data, Condition == "auto_cc")
+humcc <-subset(data, Condition == "hum_cc")
+nocc <-subset(data, Condition == "no_cc")
+
+
+#Z Scores to create a composite variable of Proficiency
+
+data %>% 
+  mutate(MTELPZ = (MTEL - mean(MTEL))/sd(MTEL)) -> data
+
+data %>% 
+  mutate(MeanSkillsZ = (MeanSkills - mean(MeanSkills))/sd(MeanSkills)) -> data
+
+#create composite variable (NA because not all cells are filled)
+
+data %>%
+  rowwise() %>%
+  mutate(CompProfScore = mean(c(MTELPZ, MeanSkillsZ))) -> data
+data
+
+
+# Model 0
+
+data$caption.e<-factor(data$Condition,levels=c("auto_cc", "hum_cc", "no_cc"),labels=c("Auto","Human", "None"))
+contrasts(data$caption.e)<-contr.sum(3)
+contrasts(data$caption.e)
+
+
+
+m0<-glmer(Right~(1|Subject)+(1|Question),
+          family=binomial,control=glmerControl(optimizer="bobyqa"),data=data)
+summary(m0)
+
+
+# Model 1
+
+m1<-glmer(Right~caption.e+
+            (1|Subject)+(1|Question),
+          family=binomial,control=glmerControl(optimizer="bobyqa"),data=data)
+summary(m1)
+anova(m0,m1) 
+anova(m0,m1)[2,2]-anova(m0,m1)[1,2]
+
+
+
+data.plot <-summarySE(data=data,measurevar="Right",groupvars=c("Question","Condition" ),
+                      na.rm=T,conf.interval=0.95)
+data.plot <-summarySE(data=data.plot,measurevar="Right",groupvars=c("Condition"),
+                      na.rm=T,conf.interval=0.95)
+data.plot
+```
+
+# summary: main effect of human cc
+
+data.plotHum <-summarySE(data=humancc,measurevar="Right",groupvars=c("Question","Subject" ),
+                      na.rm=T,conf.interval=0.95)
+data.plotHum <-summarySE(data=data.plotHum,measurevar="Right",groupvars=c("Question"),
+                      na.rm=T,conf.interval=0.95)
+data.plotHum
+
+# plot human 
+graph1<-ggplot(data.plotHum,aes(x=Question,y=Right))+
+  geom_bar(position=position_dodge(),stat="identity",
+           colour="black", # Use black outlines
+           size=.3)+ # Thinner lines
+  geom_errorbar(aes(ymin=Right-se,ymax=Right+se),
+                width=.2,
+                position=position_dodge(.9))+
+  xlab("Qs number")+
+  ylab("Proportion of correct human captions responses")+
+  guides(fill=F)+
+  ylim(0,1)+
+  theme_set(theme_bw(base_size=12))
+
+# prune graph/add asterisks (500*400)
+graph1+theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        axis.line=element_line(colour="black"))
+```
+
+# summary: main effect of automatic cc
+```{r}
+data.plotAuto <-summarySE(data=autocc,measurevar="Right",groupvars=c("Question","Subject" ),
+                      na.rm=T,conf.interval=0.95)
+data.plotAuto <-summarySE(data=data.plotAuto,measurevar="Right",groupvars=c("Question"),
+                      na.rm=T,conf.interval=0.95)
+data.plotAuto
+
+# plot auto
+graph1<-ggplot(data.plotAuto,aes(x=Question,y=Right))+
+  geom_bar(position=position_dodge(),stat="identity",
+           colour="black", # Use black outlines
+           size=.3)+ # Thinner lines
+  geom_errorbar(aes(ymin=Right-se,ymax=Right+se),
+                width=.2,
+                position=position_dodge(.9))+
+  xlab("Qs number")+
+  ylab("Proportion of correct auto captions responses")+
+  guides(fill=F)+
+  ylim(0,1)+
+  theme_set(theme_bw(base_size=12))
+
+# prune graph/add asterisks (500*400)
+graph1+theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        axis.line=element_line(colour="black"))
+
+
+
+# summary: main effect of automatic cc
+
+data.plotNone <-summarySE(data = nocc, measurevar="Right",groupvars=c("Question","Subject"),
+                      na.rm=T,conf.interval=0.95)
+data.plotNone <-summarySE(data=data.plotNone,measurevar="Right",groupvars=c("Question"),
+                      na.rm=T,conf.interval=0.95)
+data.plotNone
+
+# plot no cc
+graph1<-ggplot(data.plotNone, aes(x=Question,y=Right))+
+  geom_bar(position=position_dodge(),stat="identity",
+           colour= "Black", # Use black outlines
+           size=.3)+ # Thinner lines
+  geom_errorbar(aes(ymin=Right-se,ymax=Right+se),
+                width=.2,
+                position=position_dodge(.9))+
+  xlab("Qs number")+
+  ylab("Proportion of correct no captions responses")+
+  guides(fill=F)+
+  ylim(0,1)+
+  theme_set(theme_bw(base_size=12))
+
+# prune graph/add asterisks (500*400)
+graph1+theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        axis.line=element_line(colour="black"))
+
+# Summary: comparison between conditions
+
+data.plot <-summarySE(data=data,measurevar="Right",groupvars=c("Question","Condition" ),
+                      na.rm=T,conf.interval=0.95)
+data.plot <-summarySE(data=data.plot,measurevar="Right",groupvars=c("Question","Condition"),
+                      na.rm=T,conf.interval=0.95)
+data.plot
+
+ 
+data.plot %>% 
+  ggplot(aes(x = Question, y = Right, 
+             fill = Condition)) +
+  geom_col(position = position_dodge())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
