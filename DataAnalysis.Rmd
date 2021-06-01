@@ -36,6 +36,7 @@ There are 75 participants
 ```{r}
 data$X<-NULL
 
+data$MeanSkills <- as.factor(data$MeanSkills ) 
 data$MeanSkills <- as.numeric(data$MeanSkills ) 
 
 length(unique(data$Subject))
