@@ -1,0 +1,100 @@
+---
+title: "datanalysis"
+author: "Shamira Venturini"
+date: "6/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("tidyverse")
+library("dplyr")
+library("Rmisc")
+library("tidyr")
+library("lme4")
+library(plyr)
+library(readr)
+library(ggplot2)
+library(GGally)
+library(mlbench)
+library(caret) 
+
+```
+
+```{r}
+setwd("/Users/shamiraventurini/Desktop/Pilot")
+data <- read.csv("./PilotData.csv")
+mydf <- read.table("./PilotData.csv", sep = ',', header = TRUE) 
+data <- as_tibble(mydf) 
+data
+```
+
+There are 75 participants
+```{r}
+data$X<-NULL
+
+data$MeanSkills <- as.numeric(data$MeanSkills ) 
+
+length(unique(data$Subject))
+
+```
+
+```{r}
+summary(data$Age)
+
+```
+
+data normalisation
+
+```{r}
+ 
+preproc1 <- preProcess(data[,c(3,4)], method=c("center", "scale"))
+ 
+norm1 <- predict(preproc1, data[,c(3,4)])
+ 
+summary(norm1)
+ 
+```
+
+Composite score of prof without normalization
+```{r}
+data %>% 
+  mutate(MTELPZ = (MTEL - mean(MTEL))/sd(MTEL)) -> data
+
+data %>% 
+  mutate(MeanSkillsZ = (MeanSkills - mean(MeanSkills))/sd(MeanSkills)) -> data
+
+#create composite variable (NA because not all cells are filled)
+
+data %>%
+  rowwise() %>%
+  mutate(CompProfScore = mean(c(MTELPZ, MeanSkillsZ))) -> data
+data
+```
+
+Attempt _ composite score of prof with norm
+
+```{r}
+data %>% 
+  mutate(MTELPZ = (norm1$MTEL - mean(norm1$MTEL))/sd(norm1$MTEL)) -> data
+
+data %>% 
+  mutate(MeanSkillsZ = (norm1$MeanSkills - mean(norm1$MeanSkills))/sd(norm1$MeanSkills)) -> data
+
+#create composite variable (NA because not all cells are filled)
+
+data %>%
+  rowwise() %>%
+  mutate(CompProfScore = mean(c(norm1$MTELPZ, norm1$MeanSkillsZ))) -> data
+data
+```
+Group data by condition
+```{r}
+autocc <-subset(data, Condition == "auto_cc")
+humcc <-subset(data, Condition == "hum_cc")
+nocc <-subset(data, Condition == "no_cc")
+```
+  
