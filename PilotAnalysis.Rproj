@@ -1,46 +1,69 @@
 library("tidyverse")
-library('dplyr')
+library("dplyr")
 library("Rmisc")
 library("tidyr")
-library('lme4')
-```
-Let's load the 'totals' sheet from the file and see data distribution:
-```{r}
+library("lme4")
+library(plyr)
+library(readr)
+library(ggplot2)
+library(GGally)
+library(mlbench)
+library(caret) 
+library("devtools")
+library(ggeffects)
+
+
 setwd("/Users/shamiraventurini/Desktop/Pilot")
-data <- read.csv("./Data.csv")
-mydf <- read.table("./Data.csv", sep = ';', header = TRUE) 
+data <- read.csv("./PilotData.csv")
+mydf <- read.table("./PilotData.csv", sep = ',', header = TRUE) 
 data <- as_tibble(mydf) 
 data
-```
 
-#Dividing data by condition
 
+There are 76 participants
+
+data$X<-NULL
+
+length(unique(data$Subject))
+
+
+summary(data$Age)
+summary(data$MTELP)
+
+
+Correlation: MTELP + listening skills don't correlate: 0.47 - MTELP only
+
+
+cor(data$MTELP, data$Skills,  method = "pearson", use = "complete.obs") #0.46 (low) - I'll use MTELP only
+
+
+
+Group by condition
 
 
 autocc <-subset(data, Condition == "auto_cc")
-humcc <-subset(data, Condition == "hum_cc")
+humcc <-subset(data, Condition == "human_cc")
 nocc <-subset(data, Condition == "no_cc")
 
+Analysis by condition
 
-#Z Scores to create a composite variable of Proficiency
 
-data %>% 
-  mutate(MTELPZ = (MTEL - mean(MTEL))/sd(MTEL)) -> data
+data.plot <-summarySE(data=data,measurevar="Right",groupvars=c("Subject","Condition" ),
+                      na.rm=T,conf.interval=0.95)
+data.plot <-summarySE(data=data.plot,measurevar="Right",groupvars=c("Condition"),
+                      na.rm=T,conf.interval=0.95)
+data.plot
 
-data %>% 
-  mutate(MeanSkillsZ = (MeanSkills - mean(MeanSkills))/sd(MeanSkills)) -> data
-
-#create composite variable (NA because not all cells are filled)
-
-data %>%
-  rowwise() %>%
-  mutate(CompProfScore = mean(c(MTELPZ, MeanSkillsZ))) -> data
-data
-
+print('auto caption')
+summary(autocc)
+print('human caption')
+summary(humcc)
+print('no caption')
+summary(nocc)
 
 # Model 0
 
-data$caption.e<-factor(data$Condition,levels=c("auto_cc", "hum_cc", "no_cc"),labels=c("Auto","Human", "None"))
+data$caption.e<-factor(data$Condition,levels=c("auto_cc", "human_cc", "no_cc"),labels=c("Auto","Human", "None"))
 contrasts(data$caption.e)<-contr.sum(3)
 contrasts(data$caption.e)
 
@@ -61,15 +84,120 @@ anova(m0,m1)
 anova(m0,m1)[2,2]-anova(m0,m1)[1,2]
 
 
+m2<-glmer(Right~caption.e+MTELP+
+            (1|Subject)+(1|Question),
+          family=binomial,control=glmerControl(optimizer="bobyqa"),data=data)
+summary(m2)
+anova(m1,m2) 
+anova(m1,m2)[2,2]-anova(m1,m2)[1,2]
 
-data.plot <-summarySE(data=data,measurevar="Right",groupvars=c("Question","Condition" ),
-                      na.rm=T,conf.interval=0.95)
-data.plot <-summarySE(data=data.plot,measurevar="Right",groupvars=c("Condition"),
-                      na.rm=T,conf.interval=0.95)
-data.plot
+
+m3<-glmer(Right~caption.e*MTELP+
+            (1|Subject)+(1|Question),
+          family=binomial,control=glmerControl(optimizer="bobyqa"),data=data)
+summary(m3)
+anova(m2,m3) 
+anova(m2,m3)[2,2]-anova(m2,m3)[1,2]
+
+
+#ANALYSIS BY PROFICIENCY
+Right prediction by Eng proficiency
+
+fit.prova=lm(Right~MTELP+Condition,data=data)
+summary(fit.prova)
+
+ggplot(data = data , aes(x=MTELP, y=Right, color = Condition)) +
+ylim(0,1)+ylab("Right")+
+  xlab("Proficiency")+geom_point()+
+  geom_smooth(method=lm)
+# Remove confidence intervals
+# Extend the regression lines
+ggplot(data = data , aes(x=MTELP, y=Right, color = Condition)) +
+  ylim(0,1)+ylab("Main effect")+
+  xlab("MTELP")+
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
 ```
 
-# summary: main effect of human cc
+Analysis by course + condition
+
+
+BA <- subset(data, Course == "BA")
+MA <- subset(data, Course == "MA")
+
+print('BA')
+summary(BA)
+
+data.ba <-summarySE(data=BA,measurevar="Right",groupvars=c("Subject","Condition" ),
+                      na.rm=T,conf.interval=0.95)
+data.ba <-summarySE(data=data.ba,measurevar="Right",groupvars=c("Condition"),
+                      na.rm=T,conf.interval=0.95)
+data.ba
+
+print("MA")
+summary(MA)
+
+data.ma <-summarySE(data=MA,measurevar="Right",groupvars=c("Subject","Condition" ),
+                      na.rm=T,conf.interval=0.95)
+data.ma <-summarySE(data=data.ma,measurevar="Right",groupvars=c("Condition"),
+                      na.rm=T,conf.interval=0.95)
+data.ma
+
+
+Right prediction by Course + Eng proficiency + Condition
+
+
+#BA
+fit.ba=lm(Right~MTELP+Condition,data=BA)
+summary(fit.ba)
+
+ggplot(data = BA , aes(x=MTELP, y=Right, color = Condition)) +
+ylim(0,1)+ylab("Right")+
+  xlab("Proficiency")+geom_point()+
+  geom_smooth(method=lm)
+# Remove confidence intervals
+# Extend the regression lines
+ggplot(data = BA , aes(x=MTELP, y=Right, color = Condition)) +
+  ylim(0,1)+ylab("Main effect")+
+  xlab("MTELP")+
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+
+#MA
+fit.ma=lm(Right~MTELP+Condition,data=MA)
+summary(fit.ma)
+
+ggplot(data = MA , aes(x=MTELP, y=Right, color = Condition)) +
+ylim(0,1)+ylab("Right")+
+  xlab("Proficiency")+geom_point()+
+  geom_smooth(method=lm)
+# Remove confidence intervals
+# Extend the regression lines
+ggplot(data = MA , aes(x=MTELP, y=Right, color = Condition)) +
+  ylim(0,1)+ylab("Main effect")+
+  xlab("MTELP")+
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+
+Analysis by condition + cc use
+
+
+#probably better histo
+fit.cc=lm(Right~HabCC,data=data)
+summary(fit.cc)
+
+ggplot(data = data , aes(x=MTELP, y=Right, color = HabCC)) +
+ylim(0,1)+ylab("Right")+
+  xlab("Proficiency")+geom_point()+
+  geom_smooth(method=lm)
+# Remove confidence intervals
+# Extend the regression lines
+ggplot(data = data , aes(x=MTELP, y=Right, color = HabCC)) +
+  ylim(0,1)+ylab("Main effect")+
+  xlab("MTELP")+
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+
+
+
+Analysis by question + condition
+# summary: main effect of human cc 
 
 data.plotHum <-summarySE(data=humancc,measurevar="Right",groupvars=c("Question","Subject" ),
                       na.rm=T,conf.interval=0.95)
@@ -85,7 +213,7 @@ graph1<-ggplot(data.plotHum,aes(x=Question,y=Right))+
   geom_errorbar(aes(ymin=Right-se,ymax=Right+se),
                 width=.2,
                 position=position_dodge(.9))+
-  xlab("Qs number")+
+  xlab("Questions")+
   ylab("Proportion of correct human captions responses")+
   guides(fill=F)+
   ylim(0,1)+
@@ -95,10 +223,9 @@ graph1<-ggplot(data.plotHum,aes(x=Question,y=Right))+
 graph1+theme(panel.grid.major=element_blank(),
         panel.grid.minor=element_blank(),
         axis.line=element_line(colour="black"))
-```
+
 
 # summary: main effect of automatic cc
-```{r}
 data.plotAuto <-summarySE(data=autocc,measurevar="Right",groupvars=c("Question","Subject" ),
                       na.rm=T,conf.interval=0.95)
 data.plotAuto <-summarySE(data=data.plotAuto,measurevar="Right",groupvars=c("Question"),
@@ -166,18 +293,3 @@ data.plot %>%
   ggplot(aes(x = Question, y = Right, 
              fill = Condition)) +
   geom_col(position = position_dodge())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
