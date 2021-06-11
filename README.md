@@ -1,2 +1,2 @@
-# PilotAnalysis
-This is the analysis computed on my Pilot experiment's results. I am aware important files are not present yet in the repositository. I will update it asap
+# Pilot study
+This repository contains all my Python and R codes for my MA thesis on the effect of automatic captions on comprehension.
